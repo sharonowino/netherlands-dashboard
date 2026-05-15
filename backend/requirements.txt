@@ -19,4 +19,4 @@ scipy==1.13.1
 plotly==5.22.0
 folium==0.16.0
 celery[redis]==5.3.1
-redis==4.5.5
+redis
