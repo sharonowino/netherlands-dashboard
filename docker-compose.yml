@@ -45,7 +45,7 @@ services:
     container_name: transit_frontend
     ports:
       - "8501:8501"
-    volumes:
+    # volumes:
       # Uncomment for live code reload during development:
       # - ./frontend:/app
     environment:

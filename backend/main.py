@@ -161,22 +161,49 @@ GTFS_TRIP_UPDATE_URL = os.getenv(
 )
 
 # Feature names — order must match training column order exactly
-# Environment overrides
+# NOTE: Model was trained with 37 features (low-level GTFS features)
+# Updated from model metadata to match the trained RandomForest model
+# The scaler (scaler_latest.pkl) needs to be retrained to match these 37 features
 FORCE_LOAD_MODELS = os.getenv('FORCE_LOAD_MODELS','true').lower() in ('1','true','yes')
 
 FEATURE_NAMES: List[str] = [
-    "speed_mean",        # km/h average over window
-    "speed_std",         # km/h standard deviation
-    "delay_mean_5m",     # seconds, 5-min rolling average
-    "delay_mean_15m",    # seconds, 15-min rolling average
-    "delay_mean_30m",    # seconds, 30-min rolling average
-    "bunching_index",    # 0-1  fraction of vehicles bunched
-    "on_time_pct",       # 0-1  fraction of trips on-time
-    "headway_variance",  # seconds² schedule regularity
-    "alert_nlp_score",   # 0-1  NLP severity of service alerts
-    "alert_count",       # number of active alerts on this route
-    "fleet_utilization", # 0-1  fraction of planned vehicles active
-    "speed_drop_ratio",  # 0-1  fraction of stops with speed below threshold
+    "direction_id",
+    "schedule_relationship",
+    "latitude",
+    "longitude",
+    "current_stop_sequence",
+    "stop_sequence",
+    "stop_time_schedule_relationship",
+    "arrival_delay",
+    "arrival_time",
+    "departure_delay",
+    "departure_time",
+    "delay_sec",
+    "actual_time_sec",
+    "has_overlapping_alert",
+    "delay_min",
+    "missing_schedule",
+    "stop_lat",
+    "stop_lon",
+    "has_alert",
+    "prev_trip_delay_at_stop",
+    "cumulative_delay_along_route",
+    "delay_velocity",
+    "delay_acceleration",
+    "delay_cascade_rate",
+    "headway_sec",
+    "scheduled_headway",
+    "headway_regularity",
+    "bunching_indicator",
+    "service_gap_ratio",
+    "headway_cv",
+    "spatial_lag_delay",
+    "alert_duration_min",
+    "alert_count_last_hour",
+    "dwell_time_anomaly",
+    "hour",
+    "stop_congestion_index",
+    "vehicle_density",
 ]
 
 SEVERITY_MAP: Dict[int, Dict[str, str]] = {
@@ -297,6 +324,17 @@ class ModelRegistry:
                         with open(SCALER_PATH, "rb") as f:
                             self.scaler = pickle.load(f)
                         logger.info(f"Scaler loaded from {SCALER_PATH} using pickle")
+                    
+                    # Verify scaler matches expected feature count
+                    scaler_features = getattr(self.scaler, 'n_features_in_', None)
+                    if scaler_features is not None and scaler_features != len(FEATURE_NAMES):
+                        logger.warning(
+                            f"⚠️  Scaler feature mismatch: scaler has {scaler_features} features "
+                            f"but model expects {len(FEATURE_NAMES)}. Disabling scaler. "
+                            f"Please retrain scaler with the correct {len(FEATURE_NAMES)} features."
+                        )
+                        self.scaler = None
+                        
                 except Exception as exc:
                     logger.warning(f"Scaler load error: {exc}")
                     self.scaler = None
