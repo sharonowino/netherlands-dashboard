@@ -20,7 +20,3 @@ plotly==5.22.0
 folium==0.16.0
 celery[redis]==5.3.1
 redis==4.5.5
-# Development & testing
-pytest==7.5.2
-pytest-cov==4.1.0
-requests-mock==1.11.0
