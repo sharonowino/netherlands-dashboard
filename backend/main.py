@@ -123,6 +123,7 @@ def _resolve_model_path(env_var: str, default_name: str) -> Path:
     here = Path(__file__).resolve().parent
     project_root = ROOT
     candidates.extend([
+        here / 'models' / default_name,
         here / '..' / 'models' / default_name,
         project_root / 'transit_dashboard' / 'models' / default_name,
         project_root / 'models' / default_name,
@@ -132,12 +133,19 @@ def _resolve_model_path(env_var: str, default_name: str) -> Path:
     for c in candidates:
         p = Path(c).resolve()
         if p.exists():
+            logger.debug(f"[{env_var}] resolved to: {p}")
             return p
-    return Path(candidates[0]).resolve()
+    # If no candidate exists, still use the first one (usually env var or default location)
+    resolved = Path(candidates[0]).resolve() if candidates else Path(default_name)
+    logger.debug(f"[{env_var}] no existing file found; using: {resolved}")
+    return resolved
 
 RF_MODEL_PATH  = _resolve_model_path('RF_MODEL_PATH',  'model_RandomForest.pkl')
 XGB_MODEL_PATH = _resolve_model_path('XGB_MODEL_PATH', 'model_XGBoost.pkl')
 SCALER_PATH    = _resolve_model_path('SCALER_PATH',    'scaler_latest.pkl')
+
+# Log resolved paths at startup for debugging
+logger.info(f"Model paths resolved:\n  RandomForest: {RF_MODEL_PATH} (exists: {RF_MODEL_PATH.exists()})\n  XGBoost: {XGB_MODEL_PATH} (exists: {XGB_MODEL_PATH.exists()})\n  Scaler: {SCALER_PATH} (exists: {SCALER_PATH.exists()})")
 
 GTFS_RT_POSITIONS_URL = os.getenv(
     "GTFS_RT_URL",
