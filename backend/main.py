@@ -284,11 +284,19 @@ class ModelRegistry:
             self.rf_model = self._try_load(RF_MODEL_PATH, "RandomForest")
             self.xgb_model = self._try_load(XGB_MODEL_PATH, "XGBoost")
 
+            # Load scaler using the same approach as models (joblib first, then pickle)
             if SCALER_PATH.exists():
+                import joblib
                 try:
-                    with open(SCALER_PATH, "rb") as f:
-                        self.scaler = pickle.load(f)
-                    logger.info(f"Scaler loaded from {SCALER_PATH}")
+                    # Try joblib first
+                    try:
+                        self.scaler = joblib.load(SCALER_PATH)
+                        logger.info(f"Scaler loaded from {SCALER_PATH} using joblib")
+                    except Exception:
+                        # Fallback to pickle
+                        with open(SCALER_PATH, "rb") as f:
+                            self.scaler = pickle.load(f)
+                        logger.info(f"Scaler loaded from {SCALER_PATH} using pickle")
                 except Exception as exc:
                     logger.warning(f"Scaler load error: {exc}")
                     self.scaler = None
@@ -299,38 +307,38 @@ class ModelRegistry:
                 return m.get('model') or m.get('trained_model') or m
             return m
 
-            self.rf_model = _unwrap(self.rf_model)
-            self.xgb_model = _unwrap(self.xgb_model)
+        self.rf_model = _unwrap(self.rf_model)
+        self.xgb_model = _unwrap(self.xgb_model)
 
-            # Validate candidates by attempting a small smoke prediction
-            def _validate_candidate(candidate) -> bool:
-                if candidate is None:
+        # Validate candidates by attempting a small smoke prediction
+        def _validate_candidate(candidate) -> bool:
+            if candidate is None:
+                return False
+            import numpy as _np
+            X = _np.zeros((1, len(FEATURE_NAMES)))
+            try:
+                if hasattr(candidate, 'predict_proba'):
+                    _ = candidate.predict_proba(X)
+                elif hasattr(candidate, 'predict'):
+                    _ = candidate.predict(X)
+                else:
+                    # Unknown model interface; consider invalid
                     return False
-                import numpy as _np
-                X = _np.zeros((1, len(FEATURE_NAMES)))
-                try:
-                    if hasattr(candidate, 'predict_proba'):
-                        _ = candidate.predict_proba(X)
-                    elif hasattr(candidate, 'predict'):
-                        _ = candidate.predict(X)
-                    else:
-                        # Unknown model interface; consider invalid
-                        return False
-                    return True
-                except Exception as e:
-                    logger.warning(f"Model validation failed for {type(candidate).__name__}: {e}")
-                    return False
+                return True
+            except Exception as e:
+                logger.warning(f"Model validation failed for {type(candidate).__name__}: {e}")
+                return False
 
-            rf_ok = _validate_candidate(self.rf_model)
-            xgb_ok = _validate_candidate(self.xgb_model)
+        rf_ok = _validate_candidate(self.rf_model)
+        xgb_ok = _validate_candidate(self.xgb_model)
 
-            # Priority: RF > XGB > simulation, but only if validation passes
-            if rf_ok:
-                self.active_model, self.active_name = self.rf_model, "RandomForest"
-            elif xgb_ok:
-                self.active_model, self.active_name = self.xgb_model, "XGBoost"
-            else:
-                self.active_model, self.active_name = None, "simulation"
+        # Priority: RF > XGB > simulation, but only if validation passes
+        if rf_ok:
+            self.active_model, self.active_name = self.rf_model, "RandomForest"
+        elif xgb_ok:
+            self.active_model, self.active_name = self.xgb_model, "XGBoost"
+        else:
+            self.active_model, self.active_name = None, "simulation"
 
         self.load_time = datetime.utcnow()
         logger.info(f"Active model: {self.active_name}")
@@ -466,6 +474,8 @@ class RouteFeatures(BaseModel):
 
 
 class BatchRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    
     routes:     List[RouteFeatures]
     model_name: str = Field("RandomForest",
                             description="Hint only — actual model depends on what is loaded.")
