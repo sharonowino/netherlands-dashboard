@@ -1,0 +1,74 @@
+version: "3.9"
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  TransitOS — Docker Compose
+#  Backend  (FastAPI)   → http://localhost:8000  /docs for Swagger UI
+#  Frontend (Streamlit) → http://localhost:8501
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── FastAPI backend ────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: transit_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Drop new .pkl files here; call POST /model/reload — no rebuild needed
+      - ./models:/app/models:ro
+      # Uncomment for live code reload during development:
+      # - ./backend:/app
+    environment:
+      RF_MODEL_PATH:  /app/models/model_RandomForest.pkl
+      XGB_MODEL_PATH: /app/models/model_XGBoost.pkl
+      SCALER_PATH:    /app/models/scaler_latest.pkl
+      GTFS_RT_URL:    http://gtfs.ovapi.nl/nl/vehiclePositions.pb
+      GTFS_RT_ALERTS_URL: http://gtfs.ovapi.nl/nl/alerts.pb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 12s
+    restart: unless-stopped
+    networks:
+      - transit_net
+
+  # ── Streamlit frontend ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: transit_frontend
+    ports:
+      - "8501:8501"
+    volumes:
+      # Uncomment for live code reload during development:
+      # - ./frontend:/app
+    environment:
+      # Uses Docker internal DNS — resolves to the backend service above
+      API_BASE_URL:      http://backend:8000
+      REFRESH_INTERVAL:  "30"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - transit_net
+
+networks:
+  transit_net:
+    driver: bridge
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Quick reference
+#  ---------------
+#  docker compose up --build        first run
+#  docker compose up -d             background
+#  docker compose logs -f frontend  watch logs
+#  docker compose down              stop & remove
+#  docker compose down -v           also remove volumes
+# ═══════════════════════════════════════════════════════════════════════════

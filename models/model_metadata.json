@@ -1,0 +1,10 @@
+# model_metadata.json generated from available artifacts
+{
+  "models": [
+    {"name": "RandomForest", "path": "models/model_RandomForest.pkl", "wrapped": true},
+    {"name": "XGBoost", "path": "models/model_XGBoost.pkl", "wrapped": true},
+    {"name": "LightGBM", "path": "models/model_LightGBM.pkl", "wrapped": true},
+    {"name": "MLP", "path": "models/model_MLP.pkl", "wrapped": true}
+  ],
+  "scaler": {"path": "models/scaler_latest.pkl", "n_features_in_": 12}
+}
